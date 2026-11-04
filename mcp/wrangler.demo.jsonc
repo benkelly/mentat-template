@@ -1,0 +1,12 @@
+{
+  // Public demo: the made-up notes in this repo, read-only, no sign-in.
+  // Only deployed from benkelly/mentat-template. See .github/workflows/mcp.yml.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mentat-demo",
+  "main": "src/demo.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": false,
+  "routes": [{ "pattern": "mentat-demo.idk.ie", "custom_domain": true }],
+  "observability": { "enabled": true }
+}

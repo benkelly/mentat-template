@@ -52,7 +52,7 @@ jobs:
         run: npx tsc
 
       - name: Test
-        run: npx tsx test/tools.test.ts && npx tsx test/auth.test.ts && npx tsx test/write.test.ts && npx tsx test/graph.test.ts
+        run: npx tsx test/tools.test.ts && npx tsx test/auth.test.ts && npx tsx test/write.test.ts && npx tsx test/graph.test.ts && npx tsx test/demo.test.ts
 
       - name: Deploy to Cloudflare (main only, once secrets are set)
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
@@ -65,3 +65,18 @@ jobs:
             exit 0
           fi
           npx wrangler deploy
+
+      # The public demo (made-up notes, read-only, no sign-in) at mentat-demo.idk.ie.
+      # Only runs in the original repo, with its own Cloudflare token. Copies of
+      # this template never deploy it.
+      - name: Deploy public demo
+        if: github.repository == 'benkelly/mentat-template' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.DEMO_CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.DEMO_CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "DEMO_CLOUDFLARE_API_TOKEN not set, skipping the demo deploy."
+            exit 0
+          fi
+          npx wrangler deploy -c wrangler.demo.jsonc

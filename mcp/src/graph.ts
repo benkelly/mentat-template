@@ -161,7 +161,7 @@ export function graphData(notes: Notes) {
   };
 }
 
-function graphPage(notes: Notes): Response {
+export function graphPage(notes: Notes, opts: { demo?: boolean } = {}): Response {
   const nonce = randomToken();
   // JSON inside <script type="application/json">: stop "</script>" breaking out.
   const data = JSON.stringify(graphData(notes)).replace(/</g, "\\u003c");
@@ -170,7 +170,7 @@ function graphPage(notes: Notes): Response {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>mentat map</title>
+<title>${opts.demo ? "mentat demo map" : "mentat map"}</title>
 <style nonce="${nonce}">
 :root{--bg:#f7f7f5;--fg:#1c1c1c;--muted:#666;--line:#c9c9c4;--panel:#fff;--area:#2f7d5b;--project:#3567b5;--person:#b5652f;--log:#7b5bb5;--profile:#b53567;--note:#777}
 @media (prefers-color-scheme: dark){:root{--bg:#141414;--fg:#eee;--muted:#a3a3a3;--line:#3a3a3a;--panel:#1d1d1d;--area:#5fbf93;--project:#7fa7ea;--person:#e59b63;--log:#ab8ce6;--profile:#e57fa3;--note:#999}}
@@ -209,6 +209,7 @@ footer a{color:var(--muted)}
 <script nonce="${nonce}">
 (() => {
   const data = JSON.parse(document.getElementById("data").textContent);
+  const DEMO = ${opts.demo ? "true" : "false"};
   const svg = document.getElementById("g");
   const panel = document.getElementById("panel");
   const NS = "http://www.w3.org/2000/svg";
@@ -305,7 +306,7 @@ footer a{color:var(--muted)}
     const groups = types.map(t => "<h3>" + esc(t) + "</h3><ul class=list>" + data.nodes.filter(n => n.type === t).sort((a, b) => a.title.localeCompare(b.title)).map(n => '<li><button class="link" data-id="' + esc(n.id) + '">' + esc(n.title) + "</button></li>").join("") + "</ul>").join("");
     panel.innerHTML = "<h2>All notes</h2><div class=meta>" + data.nodes.length + " notes, " + data.links.length + " links. Click a dot or a name.</div>" + groups + footer();
   }
-  const footer = () => '<footer>Built ' + esc(data.built) + ' · <a href="#" data-home>All notes</a> · <a href="/graph/logout">Sign out</a></footer>';
+  const footer = () => '<footer>' + (DEMO ? 'Demo notes about a made-up person · <a href="https://github.com/benkelly/mentat-template">Source</a>' : 'Built ' + esc(data.built)) + ' · <a href="#" data-home>All notes</a>' + (DEMO ? '' : ' · <a href="/graph/logout">Sign out</a>') + '</footer>';
   panel.addEventListener("click", ev => {
     const b = ev.target.closest("[data-id]"); if (b) { ev.preventDefault(); show(b.dataset.id); }
     if (ev.target.closest("[data-home]")) { ev.preventDefault(); history.replaceState(null, "", location.pathname); home(); }

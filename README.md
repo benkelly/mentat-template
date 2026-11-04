@@ -6,6 +6,13 @@ A private knowledge base that your AI tools share. Short markdown notes about yo
 
 This repo is a template, filled with demo notes about a made-up person. Click **Use this template**, make the new repo **private**, and replace the notes with your own.
 
+## Try the demo
+
+- **Map:** https://mentat-demo.idk.ie/graph
+- **Connector:** add `https://mentat-demo.idk.ie/mcp` to Claude or OpenCode as a custom connector, with no sign-in. Then ask *"What is Robin working on?"*
+
+The demo is read-only and holds only the made-up notes in this repo. Your own copy has GitHub sign-in and is private.
+
 ## What you get
 
 - **Notes as files.** `me.md`, then `areas/`, `projects/`, `people/` and monthly `logs/`. Open the folder in Obsidian, or edit it anywhere.

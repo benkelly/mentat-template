@@ -4,7 +4,7 @@
   "scripts": {
     "bundle": "python3 ../scripts/bundle_notes.py",
     "typecheck": "npm run bundle && tsc",
-    "test": "npm run bundle && tsx test/tools.test.ts && tsx test/auth.test.ts && tsx test/write.test.ts && tsx test/graph.test.ts",
+    "test": "npm run bundle && tsx test/tools.test.ts && tsx test/auth.test.ts && tsx test/write.test.ts && tsx test/graph.test.ts && tsx test/demo.test.ts",
     "dev": "npm run bundle && wrangler dev",
     "deploy": "npm run bundle && wrangler deploy"
   },
