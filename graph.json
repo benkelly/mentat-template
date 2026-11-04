@@ -1,0 +1,182 @@
+{
+ "nodes": [
+  {
+   "id": "acme-cloud",
+   "path": "areas/acme-cloud.md",
+   "title": "Acme Cloud",
+   "type": "area",
+   "status": "active",
+   "updated": "2026-11-04"
+  },
+  {
+   "id": "cv",
+   "path": "areas/cv.md",
+   "title": "CV",
+   "type": "area",
+   "status": "active",
+   "updated": "2026-10-20"
+  },
+  {
+   "id": "home-office",
+   "path": "areas/home-office.md",
+   "title": "Home office",
+   "type": "area",
+   "status": "waiting",
+   "updated": "2026-10-28"
+  },
+  {
+   "id": "job-hunt",
+   "path": "areas/job-hunt.md",
+   "title": "Job hunt",
+   "type": "area",
+   "status": "active",
+   "updated": "2026-11-04"
+  },
+  {
+   "id": "2026-10",
+   "path": "logs/2026-10.md",
+   "title": "Log October 2026",
+   "type": "log",
+   "status": "",
+   "updated": "2026-10-30"
+  },
+  {
+   "id": "2026-11",
+   "path": "logs/2026-11.md",
+   "title": "Log November 2026",
+   "type": "log",
+   "status": "",
+   "updated": "2026-11-04"
+  },
+  {
+   "id": "me",
+   "path": "me.md",
+   "title": "Me",
+   "type": "profile",
+   "status": "",
+   "updated": "2026-11-04"
+  },
+  {
+   "id": "jordan-lee",
+   "path": "people/jordan-lee.md",
+   "title": "Jordan Lee",
+   "type": "person",
+   "status": "",
+   "updated": "2026-11-02"
+  },
+  {
+   "id": "priya-nair",
+   "path": "people/priya-nair.md",
+   "title": "Priya Nair",
+   "type": "person",
+   "status": "",
+   "updated": "2026-10-30"
+  },
+  {
+   "id": "mentat",
+   "path": "projects/mentat.md",
+   "title": "mentat",
+   "type": "project",
+   "status": "active",
+   "updated": "2026-11-04"
+  },
+  {
+   "id": "weather-station",
+   "path": "projects/weather-station.md",
+   "title": "Weather station",
+   "type": "project",
+   "status": "active",
+   "updated": "2026-10-15"
+  }
+ ],
+ "edges": [
+  {
+   "from": "acme-cloud",
+   "to": "job-hunt"
+  },
+  {
+   "from": "acme-cloud",
+   "to": "jordan-lee"
+  },
+  {
+   "from": "cv",
+   "to": "job-hunt"
+  },
+  {
+   "from": "home-office",
+   "to": "me"
+  },
+  {
+   "from": "job-hunt",
+   "to": "acme-cloud"
+  },
+  {
+   "from": "job-hunt",
+   "to": "cv"
+  },
+  {
+   "from": "job-hunt",
+   "to": "me"
+  },
+  {
+   "from": "2026-10",
+   "to": "home-office"
+  },
+  {
+   "from": "2026-10",
+   "to": "priya-nair"
+  },
+  {
+   "from": "2026-10",
+   "to": "weather-station"
+  },
+  {
+   "from": "2026-11",
+   "to": "acme-cloud"
+  },
+  {
+   "from": "2026-11",
+   "to": "job-hunt"
+  },
+  {
+   "from": "2026-11",
+   "to": "jordan-lee"
+  },
+  {
+   "from": "2026-11",
+   "to": "mentat"
+  },
+  {
+   "from": "me",
+   "to": "job-hunt"
+  },
+  {
+   "from": "me",
+   "to": "mentat"
+  },
+  {
+   "from": "jordan-lee",
+   "to": "acme-cloud"
+  },
+  {
+   "from": "priya-nair",
+   "to": "job-hunt"
+  },
+  {
+   "from": "mentat",
+   "to": "me"
+  },
+  {
+   "from": "mentat",
+   "to": "weather-station"
+  },
+  {
+   "from": "weather-station",
+   "to": "home-office"
+  },
+  {
+   "from": "weather-station",
+   "to": "mentat"
+  }
+ ]
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mentat-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": false,
+  // Your own domain or subdomain on Cloudflare. See docs/mcp.md.
+  "routes": [{ "pattern": "mentat.example.com", "custom_domain": true }],
+  "kv_namespaces": [
+    // KV namespace for OAuth grants and tokens (stored hashed).
+    // Create it with: npx wrangler kv namespace create mentat-mcp-oauth
+    { "binding": "OAUTH_KV", "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID" }
+  ],
+  "vars": {
+    // The only GitHub account allowed to sign in, by numeric user ID.
+    // Logins can be renamed and reclaimed. IDs can't.
+    // Find yours at https://api.github.com/users/<your-login>
+    "ALLOWED_GITHUB_ID": "REPLACE_WITH_YOUR_GITHUB_USER_ID",
+    // Your notes repository, for the optional write tools.
+    "NOTES_REPO": "your-github-user/mentat"
+  },
+  // Secrets, set once with `npx wrangler secret put <NAME>` or in the dashboard:
+  //   GITHUB_CLIENT_ID
+  //   GITHUB_CLIENT_SECRET
+  //   GITHUB_WRITE_TOKEN   (optional, turns on the write tools)
+  "observability": { "enabled": true }
+}

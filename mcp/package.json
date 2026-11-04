@@ -1,0 +1,24 @@
+{
+  "name": "mentat-mcp",
+  "version": "1.0.0",
+  "scripts": {
+    "bundle": "python3 ../scripts/bundle_notes.py",
+    "typecheck": "npm run bundle && tsc",
+    "test": "npm run bundle && tsx test/tools.test.ts && tsx test/auth.test.ts && tsx test/write.test.ts && tsx test/graph.test.ts",
+    "dev": "npm run bundle && wrangler dev",
+    "deploy": "npm run bundle && wrangler deploy"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^1.2.4",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261030.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.156.0"
+  },
+  "private": true,
+  "type": "module"
+}

@@ -1,0 +1,138 @@
+# Auto-merges connector log PRs after a waiting period.
+# Everything else, including new notes, waits for the owner.
+#
+# A PR is auto-merged only when:
+#   - its branch starts with mcp/ (opened by the mentat connector)
+#   - it has had no activity for WAIT_HOURS
+#   - every file is a monthly log (logs/YYYY-MM.md), and the only changes are
+#     new "- YYYY-MM-DD: ..." lines plus the frontmatter "updated:" bump
+#   - all checks pass
+#
+# New notes are not auto-merged: every chat reads the notes as trusted context,
+# so a new note should be seen by the owner first.
+#
+# Add the "hold" label to any PR to stop it auto-merging.
+# Every Monday it opens an issue listing what was auto-merged that week.
+#
+# Merges made with GITHUB_TOKEN do not trigger push workflows, so after a
+# merge this job dispatches index.yml and mcp.yml on main by hand.
+
+name: auto-merge
+
+on:
+  schedule:
+    - cron: "17 * * * *"      # hourly: merge PRs past the wait
+    - cron: "43 8 * * 1"      # Monday 08:43 UTC: weekly digest
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+  checks: read      # gh pr checks
+  statuses: read    # gh pr checks
+
+concurrency:
+  group: auto-merge
+
+env:
+  WAIT_HOURS: 72
+  BRANCH_PREFIX: "mcp/"
+  SKIP_LABEL: "hold"
+  DONE_LABEL: "auto-merged"
+
+jobs:
+  auto-merge:
+    if: github.event.schedule != '43 8 * * 1'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Merge eligible PRs
+        run: |
+          set -euo pipefail
+          cutoff=$(date -u -d "-${WAIT_HOURS} hours" +%s)
+
+          # Exit 0 only if every file is a monthly log and the patch only adds
+          # dated entry lines (and swaps the frontmatter "updated:" line).
+          cat > /tmp/log_only.py <<'PY'
+          import json, re, sys
+          files = json.load(sys.stdin)
+          log = re.compile(r"^logs/\d{4}-(0[1-9]|1[0-2])\.md$")
+          entry = re.compile(r"^\+- \d{4}-\d{2}-\d{2}: \S")
+          updated = re.compile(r"^[+-]updated: \d{4}-\d{2}-\d{2}$")
+          # Frontmatter of a brand-new monthly log, as the connector writes it.
+          header = re.compile(r"^\+(---|title: Log [A-Z][a-z]+ \d{4}|type: log|tags: \[log\])$")
+          if not files:
+              sys.exit(1)
+          for f in files:
+              if not log.match(f["filename"]):
+                  sys.exit(f"{f['filename']}: not a log")
+              if f["status"] not in ("added", "modified") or "patch" not in f:
+                  sys.exit(f"{f['filename']}: {f['status']}")
+              for line in f["patch"].splitlines():
+                  if line.startswith(("@@", " ", "\\")) or line in ("+", "-"):
+                      continue
+                  if line.startswith("-") and not updated.match(line):
+                      sys.exit(f"{f['filename']}: removes a line")
+                  new_log = f["status"] == "added"
+                  if line.startswith("+") and not (
+                      entry.match(line) or updated.match(line) or (new_log and header.match(line))
+                  ):
+                      sys.exit(f"{f['filename']}: adds something other than an entry")
+          PY
+
+          gh label create "$DONE_LABEL" --color 0e8a16 \
+            --description "Merged by the auto-merge workflow" 2>/dev/null || true
+
+          merged=0
+          prs=$(gh pr list --state open --limit 100 \
+                  --json number,updatedAt,labels,isDraft,headRefName \
+                  --jq '.[] | select(.isDraft | not)
+                            | select(.headRefName | startswith(env.BRANCH_PREFIX))
+                            | select([.labels[].name] | index(env.SKIP_LABEL) | not)
+                            | "\(.number) \(.updatedAt)"')
+
+          while read -r pr updated; do
+            [ -n "$pr" ] || continue
+            [ "$(date -u -d "$updated" +%s)" -le "$cutoff" ] || continue
+
+            if ! gh api "repos/$GH_REPO/pulls/$pr/files" --paginate --slurp \
+                 | jq 'add' | python3 /tmp/log_only.py; then
+              echo "#$pr needs review"; continue
+            fi
+
+            if ! gh pr checks "$pr" >/dev/null 2>&1; then
+              echo "#$pr checks not passing yet"; continue
+            fi
+
+            gh pr edit "$pr" --add-label "$DONE_LABEL"
+            gh pr merge "$pr" --squash --delete-branch
+            echo "#$pr auto-merged"
+            merged=$((merged + 1))
+          done <<< "$prs"
+
+          if [ "$merged" -gt 0 ]; then
+            gh workflow run index.yml --ref main
+            gh workflow run mcp.yml --ref main
+          fi
+
+  digest:
+    if: github.event.schedule == '43 8 * * 1'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Open weekly digest issue
+        run: |
+          set -euo pipefail
+          since=$(date -u -d "-7 days" +%Y-%m-%d)
+          list=$(gh pr list --state merged --label "$DONE_LABEL" \
+                   --search "merged:>=$since" --json number,title \
+                   --jq '.[] | "- #\(.number) \(.title)"')
+          [ -n "$list" ] || { echo "Nothing auto-merged this week"; exit 0; }
+          gh issue create --title "Auto-merged this week (since $since)" \
+            --body "$(printf 'Skim these and revert anything wrong.\n\n%s\n' "$list")"
