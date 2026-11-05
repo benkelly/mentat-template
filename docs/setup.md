@@ -82,6 +82,6 @@ See [mcp.md](mcp.md). The Worker in `mcp/` serves your notes at `https://mentat.
 1. claude.ai → Settings → Privacy → **Export data**. ChatGPT has a similar export.
 2. Unzip it and run:
    ```sh
-   python3 scripts/import_chat_export.py ~/Downloads/export/conversations.json --out raw/claude
+   python3 scripts/import_chat_export.py ~/Downloads/export/ --out raw/claude
    ```
 3. `raw/` is git-ignored. Ask an AI to read the chats on a topic and update the summary notes.

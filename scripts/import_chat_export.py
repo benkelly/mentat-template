@@ -3,6 +3,10 @@
 
 Usage:
   python3 scripts/import_chat_export.py path/to/conversations.json [--out raw/claude]
+  python3 scripts/import_chat_export.py path/to/unzipped-export/ [--out raw/chatgpt]
+
+Large ChatGPT exports split chats across conversations-000.json, -001.json and
+so on. Pass the unzipped folder (or several files) and they are all read.
 
 Output goes to raw/ by default, which is git-ignored. Read the files, then
 write short summaries into the notes. Never commit the raw files.
@@ -55,26 +59,41 @@ def chatgpt_chats(data):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("export")
+    ap.add_argument("export", nargs="+", help="conversations*.json files, or the unzipped export folder")
     ap.add_argument("--out", default="raw/chats")
     args = ap.parse_args()
 
-    data = json.loads(Path(args.export).read_text(encoding="utf-8"))
+    files = []
+    for e in map(Path, args.export):
+        files += sorted(e.glob("conversations*.json")) if e.is_dir() else [e]
+    if not files:
+        raise SystemExit("No conversations*.json found")
+    data = []
+    for f in files:
+        data += json.loads(f.read_text(encoding="utf-8"))
     is_chatgpt = bool(data) and "mapping" in data[0]
     chats = chatgpt_chats(data) if is_chatgpt else claude_chats(data)
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     count = 0
+    written = set()
     for i, (title, created, cid, msgs) in enumerate(chats):
         date = (created or "0000-00-00")[:10]
-        path = out / f"{date}_{slugify(title, str(i))}.md"
+        base = f"{date}_{slugify(title, str(i))}"
+        path = out / f"{base}.md"
+        # Two chats can share a date and title. Keep both.
+        n = 2
+        while path in written:
+            path = out / f"{base}-{n}.md"
+            n += 1
+        written.add(path)
         with path.open("w", encoding="utf-8") as f:
             f.write(f"---\ntitle: {json.dumps(title)}\ncreated: {created}\nid: {cid}\nsource: {'chatgpt' if is_chatgpt else 'claude'}\n---\n\n")
             for sender, when, text in msgs:
                 f.write(f"### {sender} ({when[:16]})\n\n{text.strip()}\n\n")
         count += 1
-    print(f"Wrote {count} chats to {out}/")
+    print(f"Wrote {count} chats from {len(files)} file(s) to {out}/")
 
 
 if __name__ == "__main__":
