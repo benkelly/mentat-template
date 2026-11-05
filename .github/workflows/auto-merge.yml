@@ -1,18 +1,23 @@
-# Auto-merges connector log PRs after a waiting period.
+# Auto-merges small connector PRs after a waiting period.
 # Everything else, including new notes, waits for the owner.
 #
 # A PR is auto-merged only when:
 #   - its branch starts with mcp/ (opened by the mentat connector)
 #   - it has had no activity for WAIT_HOURS
-#   - every file is a monthly log (logs/YYYY-MM.md), and the only changes are
-#     new "- YYYY-MM-DD: ..." lines plus the frontmatter "updated:" bump
 #   - all checks pass
+#   - and every file is one of:
+#       - a monthly log (logs/YYYY-MM.md) where the only changes are new
+#         "- YYYY-MM-DD: ..." lines plus the frontmatter "updated:" bump
+#       - a note in areas/, projects/ or people/ where the only changes are
+#         "- [ ]" lines becoming "- [x]" with the same text (complete_item),
+#         plus the "updated:" bump
 #
-# New notes are not auto-merged: every chat reads the notes as trusted context,
-# so a new note should be seen by the owner first.
+# New notes and other edits are not auto-merged: every chat reads the notes
+# as trusted context, so a change of wording should be seen by the owner first.
 #
 # Add the "hold" label to any PR to stop it auto-merging.
-# Every Monday it opens an issue listing what was auto-merged that week.
+# Every Monday it opens a "Weekly review" issue: what was auto-merged, stale
+# notes, overdue items and what is dated in the next 7 days.
 #
 # Merges made with GITHUB_TOKEN do not trigger push workflows, so after a
 # merge this job dispatches index.yml and mcp.yml on main by hand.
@@ -55,33 +60,41 @@ jobs:
           set -euo pipefail
           cutoff=$(date -u -d "-${WAIT_HOURS} hours" +%s)
 
-          # Exit 0 only if every file is a monthly log and the patch only adds
-          # dated entry lines (and swaps the frontmatter "updated:" line).
-          cat > /tmp/log_only.py <<'PY'
+          # Exit 0 only if every file is a log that only gains dated entries, or a
+          # note where the only change is ticking items (and the "updated:" bump).
+          cat > /tmp/allowed.py <<'PY'
           import json, re, sys
           files = json.load(sys.stdin)
           log = re.compile(r"^logs/\d{4}-(0[1-9]|1[0-2])\.md$")
+          note = re.compile(r"^(areas|projects|people)/[a-z0-9][a-z0-9-]*\.md$")
           entry = re.compile(r"^\+- \d{4}-\d{2}-\d{2}: \S")
           updated = re.compile(r"^[+-]updated: \d{4}-\d{2}-\d{2}$")
           # Frontmatter of a brand-new monthly log, as the connector writes it.
           header = re.compile(r"^\+(---|title: Log [A-Z][a-z]+ \d{4}|type: log|tags: \[log\])$")
+          unticked = re.compile(r"^-(\s*[-*] )\[ \] (.+?)\s*$")
+          ticked = re.compile(r"^\+(\s*[-*] )\[x\] (.+?)\s*$")
           if not files:
               sys.exit(1)
           for f in files:
-              if not log.match(f["filename"]):
-                  sys.exit(f"{f['filename']}: not a log")
               if f["status"] not in ("added", "modified") or "patch" not in f:
                   sys.exit(f"{f['filename']}: {f['status']}")
-              for line in f["patch"].splitlines():
-                  if line.startswith(("@@", " ", "\\")) or line in ("+", "-"):
-                      continue
-                  if line.startswith("-") and not updated.match(line):
-                      sys.exit(f"{f['filename']}: removes a line")
+              lines = [l for l in f["patch"].splitlines() if not (l.startswith(("@@", " ", "\\")) or l in ("+", "-"))]
+              if log.match(f["filename"]):
                   new_log = f["status"] == "added"
-                  if line.startswith("+") and not (
-                      entry.match(line) or updated.match(line) or (new_log and header.match(line))
-                  ):
-                      sys.exit(f"{f['filename']}: adds something other than an entry")
+                  for line in lines:
+                      if line.startswith("-") and not updated.match(line):
+                          sys.exit(f"{f['filename']}: removes a line")
+                      if line.startswith("+") and not (entry.match(line) or updated.match(line) or (new_log and header.match(line))):
+                          sys.exit(f"{f['filename']}: adds something other than an entry")
+              elif note.match(f["filename"]) and f["status"] == "modified":
+                  gone = [unticked.match(l) for l in lines if l.startswith("-") and not updated.match(l)]
+                  came = [ticked.match(l) for l in lines if l.startswith("+") and not updated.match(l)]
+                  if not gone or None in gone or None in came:
+                      sys.exit(f"{f['filename']}: changes more than ticking items")
+                  if sorted(m.groups() for m in gone) != sorted(m.groups() for m in came):
+                      sys.exit(f"{f['filename']}: a ticked item's text changed")
+              else:
+                  sys.exit(f"{f['filename']}: not a log or a note")
           PY
 
           gh label create "$DONE_LABEL" --color 0e8a16 \
@@ -100,7 +113,7 @@ jobs:
             [ "$(date -u -d "$updated" +%s)" -le "$cutoff" ] || continue
 
             if ! gh api "repos/$GH_REPO/pulls/$pr/files" --paginate --slurp \
-                 | jq 'add' | python3 /tmp/log_only.py; then
+                 | jq 'add' | python3 /tmp/allowed.py; then
               echo "#$pr needs review"; continue
             fi
 
@@ -126,13 +139,20 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
     steps:
-      - name: Open weekly digest issue
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Open the weekly review issue
         run: |
           set -euo pipefail
           since=$(date -u -d "-7 days" +%Y-%m-%d)
-          list=$(gh pr list --state merged --label "$DONE_LABEL" \
+          today=$(date -u +%Y-%m-%d)
+          merged=$(gh pr list --state merged --label "$DONE_LABEL" \
                    --search "merged:>=$since" --json number,title \
                    --jq '.[] | "- #\(.number) \(.title)"')
-          [ -n "$list" ] || { echo "Nothing auto-merged this week"; exit 0; }
-          gh issue create --title "Auto-merged this week (since $since)" \
-            --body "$(printf 'Skim these and revert anything wrong.\n\n%s\n' "$list")"
+          [ -n "$merged" ] || merged="Nothing auto-merged this week."
+          review=$(python3 scripts/check_stale.py --today "$today")
+          body=$(printf '### Auto-merged since %s\n\nSkim these and revert anything wrong.\n\n%s\n\n%s\n\nAll open items: [INDEX.md](../blob/main/INDEX.md#open-items).\n' \
+                   "$since" "$merged" "$review")
+          gh issue create --title "Weekly review $today" --body "$body"

@@ -4,7 +4,7 @@
 
 - **URL:** `https://mentat.example.com/mcp`
 - **Who can use it:** only one GitHub account, matched by its numeric user ID (`ALLOWED_GITHUB_ID` in `mcp/wrangler.jsonc`). Anyone else is refused at sign-in.
-- **What it can do:** read the notes (`read_note`, `search_notes`, `list_notes`, `related_notes`, `latest_log`). With an optional token it can also propose changes, which open pull requests (see step 6).
+- **What it can do:** read the notes (`read_note`, `search_notes`, `list_notes`, `related_notes`, `latest_log`, `open_items`). With an optional token it can also propose changes, which open pull requests (see step 6): `read_note_source`, `add_log_entry`, `complete_item`, `new_note`, `propose_note_change`. Nothing is written to `main`.
 - **How notes get there:** on every push to `main`, CI bundles the notes into the Worker and redeploys it. Changes only under `docs/`, `assets/` or images skip this. Deploys queue, so two never run at once.
 
 ## One-time setup
@@ -73,6 +73,13 @@ This writes to `~/.config/opencode/opencode.jsonc` under `mcp.servers`. Then in 
 ### 6. Write access (optional)
 
 The connector can propose changes. It never writes to `main`. Each change opens a pull request, and nothing changes until you merge it.
+
+- `add_log_entry`: one dated line in this month's log. Entries for the same month join one open PR.
+- `complete_item`: tick one `- [ ]` item in a note and bump its `updated:` date.
+- `new_note`: a new area, project or person note from the standard template.
+- `propose_note_change`: replace a whole note, for anything else.
+
+Log entries and ticks are small and checkable, so `auto-merge.yml` merges them on its own after 72 hours with no activity, unless you add the `hold` label. Everything else waits for you. Every Monday it opens a "Weekly review" issue: what was auto-merged, stale notes, overdue items and what is dated in the next 7 days.
 
 Tools: `add_log_entry`, `propose_note_change`, `read_note_source`.
 
