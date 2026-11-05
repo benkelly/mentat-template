@@ -43,6 +43,9 @@ jobs:
           tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
           "$RUNNER_TEMP/gitleaks" git --redact --no-banner .
 
+      - name: Lint the notes (frontmatter, statuses, dates, style)
+        run: python3 scripts/lint_notes.py
+
       - name: Build index and check links
         run: python3 scripts/build_index.py
 

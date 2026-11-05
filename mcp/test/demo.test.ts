@@ -17,7 +17,7 @@ const rpc = async (method: string, params: unknown = {}) => {
 };
 
 const tools = (await rpc("tools/list")).result.tools.map((t: any) => t.name).sort();
-assert.deepEqual(tools, ["latest_log", "list_notes", "read_note", "related_notes", "search_notes"], "read tools only");
+assert.deepEqual(tools, ["latest_log", "list_notes", "open_items", "read_note", "related_notes", "search_notes"], "read tools only");
 
 const me = (await rpc("tools/call", { name: "read_note", arguments: { slug: "me" } })).result.content[0].text;
 assert.match(me, /Robin Hale/, "serves the demo notes");

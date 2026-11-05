@@ -37,10 +37,14 @@ const init = await rpc("initialize", {
 assert.equal(init.result.serverInfo.name, "mentat");
 
 const tools = (await rpc("tools/list")).result.tools.map((t: any) => t.name).sort();
-assert.deepEqual(tools, ["latest_log", "list_notes", "read_note", "related_notes", "search_notes"]);
+assert.deepEqual(tools, ["latest_log", "list_notes", "open_items", "read_note", "related_notes", "search_notes"]);
 
 assert.match(await call("read_note", { slug: "[[me]]" }), /How to help me/);
 assert.match(await call("search_notes", { query: "pairing" }), /\[\[acme-cloud\]\]/);
+// Stemmed search: "interviewing" finds notes that say "interview" and "interviewer"; the title hit ranks first.
+assert.match(await call("search_notes", { query: "interviewing" }), /\[\[acme-cloud\]\]/);
+assert.match((await call("search_notes", { query: "acme recruiter" })).split("\n")[0], /\[\[(acme-cloud|jordan-lee|work-contacts)\]\]/);
+assert.match(await call("search_notes", { query: "zzzznothing" }), /Nothing found/);
 assert.match(await call("list_notes", { type: "project" }), /\[\[weather-station\]\]/);
 const rel = await call("related_notes", { slug: "acme-cloud" });
 assert.match(rel, /Links to:[\s\S]*\[\[job-hunt\]\]/);
@@ -49,5 +53,11 @@ assert.match(rel, /Linked from:[\s\S]*\[\[jordan-lee\]\]/);
 const newestLog = bundle.notes.filter((n) => n.type === "log").map((n) => n.slug).sort().at(-1)!;
 assert.match(await call("latest_log"), new RegExp(newestLog.replace(/^logs\//, "")));
 assert.match(await call("read_note", { slug: "nope" }), /No note called/);
+const open = await call("open_items");
+assert.match(open, /^Today: \d{4}-\d{2}-\d{2}/);
+assert.match(open, /\[\[home-office\]\]\n  - \[ \] /);
+assert.match(open, /\nDated:\n- \d{4}-\d{2}-\d{2}: \[\[/);
+// Dates ahead come from any line, not only tasks. The desk warranty in [[home-office]] is years out, so it is always ahead.
+assert.match(open, /\nDates ahead:\n[\s\S]*2031-03-01: \[\[home-office\]\]: Desk warranty/);
 
 console.log(`ok: ${tools.length} tools, ${bundle.notes.length} notes`);

@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Build INDEX.md and graph.json from the notes, and check for broken [[links]].
 
+INDEX.md ends with an "Open items" section: every unticked `- [ ]` line
+across the notes, grouped by note, then the dated ones by the latest date each one mentions,
+then "Dates ahead": other lines that mention a date after the newest `updated:` date
+in the notes. That date stands in for today, so the output is the same whenever it is built.
+
 Usage: python3 scripts/build_index.py [--check]
 
 --check  exit 1 if any [[link]] points to a note that doesn't exist,
@@ -18,6 +23,8 @@ SKIP_DIRS = {".git", ".github", "raw", "scripts", "node_modules", ".obsidian", "
 SKIP_FILES = {"INDEX.md", "README.md", "AGENTS.md", "CLAUDE.md"}
 LINK_RE = re.compile(r"\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]")
 FENCE_RE = re.compile(r"```.*?```", re.S)
+TASK_RE = re.compile(r"^\s*[-*] \[ \] (.+?)\s*$", re.M)
+DATE_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
 
 
 def frontmatter(text):
@@ -28,7 +35,7 @@ def frontmatter(text):
             for line in text[4:end].splitlines():
                 if ":" in line and not line.startswith(" "):
                     k, v = line.split(":", 1)
-                    meta[k.strip()] = v.split("#")[0].strip()
+                    meta[k.strip()] = re.sub(r"\s+#.*$", "", v).strip()
     return meta
 
 
@@ -42,8 +49,25 @@ def notes():
         yield path, rel
 
 
+def strip_frontmatter(text):
+    if text.startswith("---\n"):
+        end = text.find("\n---", 4)
+        if end != -1:
+            return text[end + 4 :]
+    return text
+
+
+def line_text(line):
+    """A table row or list item as one short line of text."""
+    text = line.strip().lstrip("-*").strip()
+    if text.startswith("|"):
+        text = " | ".join(c.strip() for c in text.strip("|").split("|") if c.strip())
+    text = re.sub(r"\s+", " ", text)
+    return text if len(text) <= 160 else text[:157].rstrip() + "..."
+
+
 def build():
-    nodes, edges, broken = {}, [], []
+    nodes, edges, broken, tasks, dates = {}, [], [], [], []
     parsed = []
     for path, rel in notes():
         text = path.read_text(encoding="utf-8")
@@ -57,17 +81,52 @@ def build():
             "status": meta.get("status", ""),
             "updated": meta.get("updated", ""),
         }
-        parsed.append((slug, rel, FENCE_RE.sub("", text)))
+        body = FENCE_RE.sub("", text)
+        parsed.append((slug, rel, body))
+        for item in TASK_RE.findall(body):
+            tasks.append({"note": slug, "text": item, "date": max(DATE_RE.findall(item), default="")})
+        if meta.get("type") != "log":
+            for line in strip_frontmatter(body).splitlines():
+                found = DATE_RE.findall(line)
+                if found and not TASK_RE.match(line) and not line.lstrip().startswith("|---") and "| ---" not in line:
+                    dates.append({"note": slug, "text": line_text(line), "date": max(found)})
     for slug, rel, body in parsed:
         for target in sorted(set(m.strip() for m in LINK_RE.findall(body))):
             if target in nodes:
                 edges.append({"from": slug, "to": target})
             else:
                 broken.append(f"{rel}: [[{target}]]")
-    return nodes, edges, broken
+    newest = max((n["updated"] for n in nodes.values()), default="")
+    dates = [d for d in dates if d["date"] > newest]
+    return nodes, edges, broken, tasks, dates
 
 
-def render_index(nodes, edges):
+def render_open(nodes, tasks, dates):
+    """Open items grouped by note, the dated ones in date order, then other dates ahead."""
+    lines = ["## Open items", "", "Unticked tasks from every note, in one place. Dates are ISO; compare with today.", ""]
+    if not tasks and not dates:
+        return lines + ["Nothing open.", ""]
+    order = ["profile", "area", "project", "person", "people", "log"]
+    rank = {k: i for i, k in enumerate(order)}
+    by_note = {}
+    for t in tasks:
+        by_note.setdefault(t["note"], []).append(t["text"])
+    for slug in sorted(by_note, key=lambda s: (rank.get(nodes[s]["type"], len(order)), nodes[s]["title"].lower())):
+        lines.append(f"- [[{slug}]]")
+        lines += [f"  - [ ] {text}" for text in by_note[slug]]
+    dated = sorted((t for t in tasks if t["date"]), key=lambda t: (t["date"], t["note"]))
+    if dated:
+        lines += ["", "### Dated", ""]
+        lines += [f"- {t['date']}: [[{t['note']}]]: {t['text']}" for t in dated]
+    if dates:
+        newest = max(n["updated"] for n in nodes.values())
+        lines += ["", "### Dates ahead", "", f"Other lines that mention a date after {newest}, the newest note update.", ""]
+        lines += [f"- {d['date']}: [[{d['note']}]]: {d['text']}" for d in sorted(dates, key=lambda d: (d["date"], d["note"]))]
+    lines.append("")
+    return lines
+
+
+def render_index(nodes, edges, tasks, dates):
     backlinks = {}
     for e in edges:
         backlinks.setdefault(e["to"], set()).add(e["from"])
@@ -89,13 +148,14 @@ def render_index(nodes, edges):
             refs = ", ".join(f"[[{b}]]" for b in sorted(backlinks.get(n["id"], [])))
             lines.append(f"| [[{n['id']}]] ({n['path']}) | {n['status']} | {n['updated']} | {refs} |")
         lines.append("")
+    lines += render_open(nodes, tasks, dates)
     return "\n".join(lines)
 
 
 def main():
     check = "--check" in sys.argv
-    nodes, edges, broken = build()
-    index = render_index(nodes, edges)
+    nodes, edges, broken, tasks, dates = build()
+    index = render_index(nodes, edges, tasks, dates)
     graph = json.dumps({"nodes": list(nodes.values()), "edges": edges}, indent=1) + "\n"
     if broken:
         print("Broken links:\n  " + "\n  ".join(broken))
@@ -110,7 +170,7 @@ def main():
         sys.exit(1 if broken or stale else 0)
     (ROOT / "INDEX.md").write_text(index, encoding="utf-8")
     (ROOT / "graph.json").write_text(graph, encoding="utf-8")
-    print(f"{len(nodes)} notes, {len(edges)} links, {len(broken)} broken")
+    print(f"{len(nodes)} notes, {len(edges)} links, {len(tasks)} open items, {len(broken)} broken")
     sys.exit(1 if broken else 0)
 
 

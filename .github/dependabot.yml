@@ -4,7 +4,13 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
   - package-ecosystem: npm
     directory: /mcp
     schedule:
       interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]

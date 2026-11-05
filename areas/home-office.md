@@ -10,9 +10,14 @@ tags: [home]
 
 New desk ordered. Waiting for delivery.
 
+## Key facts
+
+- Desk warranty: ends 2031-03-01.
+
 ## Next steps
 
 - [ ] Mount the second monitor when the desk arrives.
+- [ ] 2026-11-20: Return the old chair.
 
 ## Related
 

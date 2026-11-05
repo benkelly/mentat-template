@@ -42,7 +42,10 @@ assert.equal(todayLocal(new Date("2026-11-04T23:30:00Z")), "2026-11-04");
 
 // --- GitHubWriter against a fake GitHub ---
 const calls: { method: string; url: string; body?: any }[] = [];
-const files: Record<string, string> = { "logs/2026-11.md": "---\ntitle: Log November 2026\ntype: log\nupdated: 2026-11-02\n---\n\n- 2026-11-02: A.\n" };
+const files: Record<string, string> = {
+  "logs/2026-11.md": "---\ntitle: Log November 2026\ntype: log\nupdated: 2026-11-02\n---\n\n- 2026-11-02: A.\n",
+  "areas/home.md": "---\ntitle: Home\ntype: area\nstatus: active\nupdated: 2026-11-01\ntags: [home]\n---\n\n## Next steps\n\n- [ ] Pick a paint colour for the hall.\n- [ ] Book the boiler service.\n",
+};
 let openPrs: any[] = [];
 const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = String(input);
@@ -101,7 +104,7 @@ async function rpc(method: string, params: unknown, w: GitHubWriter | null = wri
 const call = async (name: string, args: Record<string, unknown>) => (await rpc("tools/call", { name, arguments: args })).result;
 
 const names = (await rpc("tools/list", {})).result.tools.map((t: any) => t.name);
-for (const t of ["add_log_entry", "propose_note_change", "read_note_source"]) assert.ok(names.includes(t), `has ${t}`);
+for (const t of ["add_log_entry", "propose_note_change", "read_note_source", "complete_item", "new_note"]) assert.ok(names.includes(t), `has ${t}`);
 const readOnly = (await rpc("tools/list", {}, null)).result.tools.map((t: any) => t.name);
 assert.ok(!readOnly.includes("add_log_entry"), "no write tools without a token");
 
@@ -121,6 +124,47 @@ r = await call("propose_note_change", { path: "areas/test.md", content: note, re
 assert.ok(!r.isError, r.content[0].text);
 r = await call("read_note_source", { path: "logs/2026-11.md" });
 assert.match(r.content[0].text, /title: Log November 2026/);
+
+// complete_item ticks one line and bumps the date, nothing else.
+calls.length = 0;
+r = await call("complete_item", { path: "areas/home.md", item: "paint colour", date: "2026-11-05" });
+assert.ok(!r.isError, r.content[0].text);
+const tickPut = calls.find((c) => c.method === "PUT")!;
+assert.match(tickPut.url, /\/contents\/areas\/home\.md$/);
+assert.equal(
+  atob(tickPut.body.content),
+  "---\ntitle: Home\ntype: area\nstatus: active\nupdated: 2026-11-05\ntags: [home]\n---\n\n## Next steps\n\n- [x] Pick a paint colour for the hall.\n- [ ] Book the boiler service.\n",
+);
+r = await call("complete_item", { path: "areas/home.md", item: "the" });
+assert.ok(r.isError && /More than one/.test(r.content[0].text));
+r = await call("complete_item", { path: "areas/nope.md", item: "x" });
+assert.ok(r.isError && /No file/.test(r.content[0].text));
+r = await call("complete_item", { path: "logs/2026-11.md", item: "x" });
+assert.ok(r.isError && /add_log_entry/.test(r.content[0].text));
+
+// new_note renders the template and refuses existing paths, wrong folders and unknown related slugs.
+calls.length = 0;
+r = await call("new_note", {
+  path: "people/sam-ortiz-test.md",
+  title: "Sam Ortiz",
+  type: "person",
+  tags: ["people", "acme"],
+  summary: "Recruiter at Acme Cloud.",
+  next_steps: ["Intro call 2026-11-09."],
+  related: ["job-hunt"],
+  reason: "New recruiter contact.",
+});
+assert.ok(!r.isError, r.content[0].text);
+const newPut = calls.find((c) => c.method === "PUT")!;
+assert.match(atob(newPut.body.content), /^---\ntitle: Sam Ortiz\ntype: person\nupdated: \d{4}-\d{2}-\d{2}\ntags: \[people, acme\]\n---\n\n## Status\n\nRecruiter at Acme Cloud\.\n\n## Next steps\n\n- \[ \] Intro call 2026-11-09\.\n\n## Related\n\n- \[\[job-hunt\]\]\n$/);
+r = await call("new_note", { path: "areas/home.md", title: "Home", type: "area", status: "active", tags: [], reason: "x" });
+assert.ok(r.isError && /already exists/.test(r.content[0].text));
+r = await call("new_note", { path: "areas/thing.md", title: "Thing", type: "area", tags: [], reason: "x" });
+assert.ok(r.isError && /needs a status/.test(r.content[0].text));
+r = await call("new_note", { path: "areas/bob.md", title: "Bob", type: "person", tags: [], reason: "x" });
+assert.ok(r.isError && /goes in people\//.test(r.content[0].text));
+r = await call("new_note", { path: "projects/thing.md", title: "Thing", type: "project", status: "idea", tags: [], related: ["nope"], reason: "x" });
+assert.ok(r.isError && /No note called 'nope'/.test(r.content[0].text));
 
 // A second log entry joins the open log PR instead of opening another one.
 openPrs = [

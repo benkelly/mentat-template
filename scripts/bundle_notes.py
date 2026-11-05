@@ -9,17 +9,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build_index import FENCE_RE, LINK_RE, ROOT, frontmatter, notes  # noqa: E402
+from build_index import FENCE_RE, LINK_RE, ROOT, frontmatter, notes, strip_frontmatter  # noqa: E402
 
 OUT = ROOT / "mcp" / "src" / "notes.generated.json"
-
-
-def strip_frontmatter(text):
-    if text.startswith("---\n"):
-        end = text.find("\n---", 4)
-        if end != -1:
-            return text[end + 4 :].lstrip("\n")
-    return text
 
 
 def main():
@@ -28,7 +20,7 @@ def main():
         text = path.read_text(encoding="utf-8")
         meta = frontmatter(text)
         tags = [t.strip() for t in meta.get("tags", "").strip("[]").split(",") if t.strip()]
-        body = strip_frontmatter(text)
+        body = strip_frontmatter(text).lstrip("\n")
         links = sorted(set(m.strip() for m in LINK_RE.findall(FENCE_RE.sub("", body))))
         items.append(
             {
