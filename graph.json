@@ -73,6 +73,14 @@
    "updated": "2026-10-30"
   },
   {
+   "id": "work-contacts",
+   "path": "people/work-contacts.md",
+   "title": "Work contacts",
+   "type": "people",
+   "status": "",
+   "updated": "2026-11-04"
+  },
+  {
    "id": "mentat",
    "path": "projects/mentat.md",
    "title": "mentat",
@@ -161,6 +169,18 @@
   {
    "from": "priya-nair",
    "to": "job-hunt"
+  },
+  {
+   "from": "work-contacts",
+   "to": "acme-cloud"
+  },
+  {
+   "from": "work-contacts",
+   "to": "jordan-lee"
+  },
+  {
+   "from": "work-contacts",
+   "to": "priya-nair"
   },
   {
    "from": "mentat",
