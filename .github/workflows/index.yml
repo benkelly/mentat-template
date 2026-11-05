@@ -68,10 +68,12 @@ jobs:
             # Another merge may have landed while this ran. Rebase onto it and retry.
             for i in 1 2 3; do
               git push && exit 0
-              git pull --rebase origin main
+              git fetch origin main
+              git reset --hard origin/main
               python3 scripts/build_index.py
               git add INDEX.md graph.json
-              git diff --cached --quiet || git commit --amend --no-edit
+              git diff --cached --quiet && exit 0
+              git commit -m "Regenerate index [skip ci]"
             done
             exit 1
           fi
