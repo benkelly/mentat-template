@@ -29,10 +29,11 @@ The demo is read-only and holds only the made-up notes in this repo. Your own co
 2. Replace `me.md` and the demo notes with your own. See [AGENTS.md](AGENTS.md) for the note format.
 3. Follow [docs/mcp.md](docs/mcp.md) to deploy the server and connect Claude or OpenCode.
 4. Optional: [docs/setup.md](docs/setup.md) for Obsidian and importing old chats.
+5. Lock it down: [docs/security.md](docs/security.md) protects `main`, signs agent commits and keeps tokens narrow.
 
 ## Keep it private
 
-Your notes repo should be private. Never commit raw chat exports, bank details, ID numbers or passwords. CI runs gitleaks and a private-data check on every push, but they are a safety net, not a guarantee.
+Your notes repo should be private. Never commit raw chat exports, bank details, ID numbers or passwords. CI runs gitleaks and a private-data check on every push, but they are a safety net, not a guarantee. See [docs/security.md](docs/security.md).
 
 ## Licence
 

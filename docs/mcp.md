@@ -129,3 +129,4 @@ npm run dev       # local Worker at http://localhost:8787 (needs a .dev.vars fil
 - The notes are bundled into the Worker. They're only served after sign-in.
 - To cut off every connected app: delete the KV namespace contents, or rotate the GitHub client secret.
 - Writes only ever open pull requests, from branches named `mcp/...`. A chat that is tricked into writing something can only open a PR, which you can close.
+- Protect `main` and keep the write token narrow: see [security.md](security.md).
